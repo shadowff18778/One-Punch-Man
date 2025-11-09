@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lecteur One-Punch Man</title>
+    <!-- Chargement de Tailwind CSS pour le style général et les utilitaires -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuration de la police Inter par défaut -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Styles généraux de l'application pour un look premium sombre */
+        body { background-color: #0B111F; } /* Fond sombre OPM */
+        .card-bg { 
+            background-color: #1A202C; 
+            border-radius: 1.5rem; 
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6); 
+        }
+        .primary-red { color: #DC2626; }
+        .primary-bg-red { background-color: #DC2626; }
+        .primary-bg-red-hover:hover { background-color: #B91C1C; }
+        .primary-yellow { color: #FFD700; }
+        .active-episode {
+            background-color: #2D3748; 
+            border-left: 4px solid #FFD700; 
+            color: #FFFFFF; 
+            font-weight: 600;
+        }
+        /* Custom Scrollbar (Mac-like) */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #2D3748; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #DC2626; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #B91C1C; }
+        .season-card {
+            background-size: cover;
+            background-position: center;
+            min-height: 200px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #DC2626;
+        }
+        .season-content {
+            background: rgba(0, 0, 0, 0.75); 
+            padding: 1rem;
+            border-radius: 0 0 1rem 1rem;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+        }
+        
+        /* Styles spécifiques au lecteur vidéo */
+        .playback-line {
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.3); 
+            width: 100%;
+            cursor: pointer;
+            transition: height 0.1s ease-out; 
+        }
+        .playback-line:hover {
+            height: 8px; 
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0;
+            background-color: #DC2626; 
+            transition: width 0.1s linear;
+        }
+        /* Styling du slider de volume */
+        input[type=range].volume-slider {
+            -webkit-appearance: none;
+            width: 80px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        input[type=range].volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #DC2626; 
+            cursor: pointer;
+            border-radius: 50%;
+            border: 0;
+            box-shadow: -100vw 0 0 100vw #DC2626; 
+            transition: all 0.1s ease-out;
+        }
+        input[type=range].volume-slider:hover::-webkit-slider-thumb {
+            transform: scale(1.1);
+            background: #FFD700;
+        }
+
+        /* Fullscreen styles: Cache le curseur en mode plein écran */
+        #new-video-container:-webkit-full-screen { cursor: none; }
+        #new-video-container:-moz-full-screen { cursor: none; }
+        #new-video-container:-ms-full-screen { cursor: none; }
+        #new-video-container:fullscreen { cursor: none; }
+        
+        /* SIGNATURE STYLING MODIFIÉ (Plus petite, sans animation) */
+        #signature-shadow {
+             /* Taille réduite de lg à sm/base */
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.25rem; /* leading-5 */
+            font-weight: 500; /* font-medium */
+            color: #DC2626; /* primary-red */
+            transition: color 0.3s; /* Garder une petite transition */
+        }
+        /* FIN SIGNATURE STYLING MODIFIÉ */
+    </style>
+    <!-- Chargement de Font Awesome pour les icônes du lecteur -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#0B111F] text-gray-100">
+
+    <div id="app" class="mx-auto p-4 sm:p-6 w-full"> 
+
+        <!-- HEADER PREMIUM : Titre Responsive Optimisé pour Mobile -->
+        <header class="flex justify-start items-center mb-8 py-3 px-4 rounded-3xl shadow-2xl bg-[#1A202C] border-b-2 border-red-600">
+            <!-- text-2xl sur mobile, text-4xl sur plus grand -->
+            <h1 onclick="changeView('seasons')" 
+                class="text-2xl sm:text-4xl text-red-600 font-extrabold cursor-pointer hover:opacity-90 transition duration-200 truncate">
+                One-Punch Man
+            </h1>
+        </header>
+
+        <!-- Vue 1: SÉLECTION DE SAISON -->
+        <div id="view-seasons" class="view-transition">
+            <h2 class="text-3xl font-bold text-gray-200 mb-6">Sélectionnez une Saison</h2>
+            <div id="seasons-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Les saisons seront injectées ici -->
+            </div>
+        </div>
+
+        <!-- Vue 2: SÉLECTION D'ÉPISODE -->
+        <div id="view-episodes" class="view-transition hidden opacity-0 translate-x-10">
+            <!-- Bouton de retour -->
+            <button onclick="changeView('seasons')" class="flex items-center text-sm font-semibold mb-6 bg-gray-700 hover:bg-gray-600 rounded-full py-2 px-4 text-white transition duration-200 shadow-md">
+                <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                Retour aux saisons
+            </button>
+            <h2 class="text-3xl font-bold primary-yellow mb-6">
+                Épisodes de la <span id="current-season-label" class="primary-red">Saison X</span>
+            </h2>
+            <!-- Le conteneur liste -->
+            <div id="episodes-list" class="space-y-2 max-h-[75vh] card-bg p-4 rounded-3xl shadow-xl overflow-y-auto custom-scrollbar">
+                <!-- Les épisodes seront injectées ici -->
+            </div>
+        </div>
+
+        <!-- Vue 3: LECTEUR VIDÉO -->
+        <div id="view-player" class="view-transition hidden opacity-0 translate-x-10">
+            <!-- Bouton de retour stylisé -->
+            <button onclick="changeView('episodes')" class="flex items-center text-sm font-semibold mb-6 bg-gray-700 hover:bg-gray-600 rounded-full py-2 px-4 text-white transition duration-200 shadow-md">
+                <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                Retour à la liste des épisodes
+            </button>
+
+            <div class="w-full mx-auto rounded-xl overflow-hidden bg-black shadow-2xl border border-gray-700"> 
+                <!-- Conteneur vidéo -->
+                <div class="relative w-full pb-[56.25%] group" id="new-video-container">
+                    
+                    <!-- Thumbnail -->
+                    <img src="https://placehold.co/1280x720/1F2937/FBBF24?text=One-Punch+Man+%7C+Cliquez+pour+démarrer" 
+                         id="video-thumbnail" class="absolute inset-0 w-full h-full object-cover cursor-pointer transition-opacity duration-300 z-10">
+                    
+                    <!-- L'élément Video -->
+                    <video id="video" 
+                           class="absolute inset-0 w-full h-full object-cover z-0" 
+                           preload="metadata" 
+                           oncontextmenu="return false;"
+                           onclick="togglePlayPause()">
+                        <source id="video-source" src="" type="video/mp4">
+                        Votre navigateur ne supporte pas la balise vidéo.
+                    </video>
+                    
+                    <!-- Barre de Contrôle Custom -->
+                    <div id="player-controls" class="absolute bottom-0 left-0 right-0 h-10 flex flex-col-reverse justify-end bg-black bg-opacity-70 opacity-0 transition-opacity duration-300 z-20">
+                        <!-- Ligne de progression -->
+                        <div class="playback-line" id="playback-line">
+                            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                        </div>
+                        
+                        <!-- Rangée principale des contrôles -->
+                        <div class="flex justify-between items-center h-full px-4 text-white text-sm">
+                            
+                            <!-- Gauche (Skip/Play/Pause/Time) -->
+                            <div class="flex items-center space-x-3">
+                                <button id="skipminus-10" title="-10s (Flèche Gauche)" class="text-xl hover:text-red-500 transition transform hover:scale-110">
+                                    <i class="fa-solid fa-backward"></i>
+                                </button>
+                                <button id="play-pause" title="Lecture/Pause (Espace)" class="text-2xl hover:text-red-500 transition transform hover:scale-110">
+                                    <i id="play-pause-icon-bar" class="fa-solid fa-play"></i>
+                                </button>
+                                <button id="skip-10" title="+10s (Flèche Droite)" class="text-xl hover:text-red-500 transition transform hover:scale-110">
+                                    <i class="fa-solid fa-forward"></i>
+                                </button>
+                                
+                                <!-- Temps -->
+                                <div class="flex items-center ml-4 text-xs sm:text-sm font-mono font-semibold">
+                                    <span id="current-time">00:00</span>
+                                    <span class="mx-1 text-gray-400">/</span>
+                                    <span id="max-duration">00:00</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Droite (Volume/Fullscreen) -->
+                            <div class="flex items-center space-x-4">
+                                <div class="flex items-center space-x-1">
+                                    <button id="mute" title="Mute" class="text-base hover:text-red-500 transition transform hover:scale-110">
+                                        <i id="volume-icon" class="fas fa-volume-up"></i>
+                                    </button>
+                                    <!-- Volume Slider stylisé -->
+                                    <input type="range" id="volume" min="0" max="1" step="0.01" value="1" class="volume-slider w-16 sm:w-20 appearance-none cursor-pointer">
+                                </div>
+                                
+                                <!-- Bouton Plein Écran -->
+                                <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Plein Écran (Touche F)" class="text-lg hover:text-red-500 transition transform hover:scale-110">
+                                     <i id="fullscreen-icon" class="fa-solid fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- FIN BARRE DE CONTRÔLE -->
+
+                </div>
+            </div>
+
+            <!-- CONTROLE DE LANGUE ET TRACKER AMÉLIORÉS -->
+            <div class="flex flex-col md:flex-row justify-between items-center mt-6 p-4 bg-[#1A202C] rounded-xl shadow-lg border-2 border-red-600 w-full space-y-4 md:space-y-0">
+                
+                <!-- 1. TRACKER AMÉLIORÉ (Gauche) -->
+                <div class="text-center md:text-left">
+                     <p class="text-sm text-gray-400">Épisode en cours:</p>
+                    <p id="tracker-text" class="text-lg sm:text-xl font-semibold text-gray-300">
+                        <span class="primary-red font-bold" id="tracker-season-label">Saison X</span> 
+                        <span class="text-gray-400 mx-2">|</span> 
+                        <span class="primary-yellow font-extrabold" id="tracker-episode-label">Épisode Y</span>
+                        <span class="text-gray-400 hidden lg:inline mx-2">|</span> 
+                        <span class="text-gray-400 hidden lg:inline" id="tracker-global-label">Global Z sur W</span>
+                    </p>
+                </div>
+
+                <!-- 2. BOUTONS DE LANGUE (Droite) -->
+                <div class="flex space-x-3">
+                    <button id="btn-vf" onclick="setLanguage('VF')"
+                            class="px-5 py-2 rounded-full border-2 border-transparent transition-all duration-300 text-sm font-semibold bg-gray-700 hover:bg-gray-600">
+                        VF
+                    </button>
+                    <button id="btn-vost" onclick="setLanguage('VOST')"
+                            class="px-5 py-2 rounded-full border-2 border-transparent transition-all duration-300 text-sm font-semibold bg-gray-700 hover:bg-gray-600">
+                        VOST
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Boutons de navigation Épisode SUIVANT/PRÉCÉDENT -->
+            <div class="flex justify-between mt-6 space-x-4 w-full">
+                <button id="prev-episode-btn" onclick="goToPreviousEpisode()" 
+                        class="flex-1 flex items-center justify-center px-6 py-3 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold transition-all duration-300 shadow-lg disabled:bg-gray-700 disabled:shadow-none disabled:cursor-not-allowed transform hover:scale-[1.01]">
+                    <svg class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Précédent
+                </button>
+                <button id="next-episode-btn" onclick="goToNextEpisode()"
+                        class="flex-1 flex items-center justify-center px-6 py-3 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold transition-all duration-300 shadow-lg disabled:bg-gray-700 disabled:shadow-none disabled:cursor-not-allowed transform hover:scale-[1.01]">
+                    Suivant
+                    <svg class="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
+            </div>
+        </div>
+
+
+    </div>
+
+    <!-- Mentions légales -->
+    <footer class="mt-12 pt-8 pb-4 border-t border-gray-800 text-center text-gray-600 text-sm w-full">
+        <!-- Signature SHADOW (taille réduite via CSS) -->
+        <div class="mb-2">
+            <p id="signature-shadow" class="text-lg font-bold tracking-widest text-red-600">Powered By SHADOW</p>
+        </div>
+        <p>&copy; 2025 Streaming Parfait - Site de démonstration non-officiel.</p>
+    </footer>
+
+    <script>
+        // --- CONFIGURATION ET DONNÉES DE BASE ---
+        const ANIME_DATA = {
+            title: "One-Punch Man",
+            basePath: "One-Punch-Man",
+            seasons: [
+                {
+                    id: 1,
+                    label: "Saison 1",
+                    imageUrl: "https://image.tmdb.org/t/p/w1280_and_h720_bestv2/a8BknzvFVK5EZ83rKg1a83iwaj0.jpg", 
+                    episodes: Array.from({ length: 12 }, (_, i) => ({
+                        num: i + 1,
+                        title: `Le coup de poing le plus fort du monde (${i + 1}/12)`,
+                        globalNum: i + 1
+                    }))
+                },
+                {
+                    id: 2,
+                    label: "Saison 2",
+                    imageUrl: "https://wallpapercave.com/wp/wp5860477.png", 
+                    episodes: Array.from({ length: 12 }, (_, i) => ({
+                        num: i + 1,
+                        title: `L'ère des monstres (${i + 1}/12)`,
+                        globalNum: i + 13
+                    }))
+                }
+            ]
+        };
+        
+        const TOTAL_EPISODES = ANIME_DATA.seasons.reduce((sum, season) => sum + season.episodes.length, 0);
+
+        // --- ÉTAT DE L'APPLICATION ---
+        let currentSeason = null;
+        let currentEpisode = null;
+        let currentView = 'seasons'; 
+        let controlsTimeout = null; 
+        
+        // **GESTION DE LA LANGUE VIA LOCAL STORAGE**
+        const base_url = "https://cinecake.xyz/animes/"; 
+        let currentLang = localStorage.getItem('animeLangPreference') || 'VF'; // Charge VF par défaut
+
+        // --- SÉLECTEURS DU DOM ---
+        const views = {
+            seasons: document.getElementById('view-seasons'),
+            episodes: document.getElementById('view-episodes'),
+            player: document.getElementById('view-player')
+        };
+        const seasonsList = document.getElementById('seasons-list');
+        const episodesList = document.getElementById('episodes-list');
+        const videoContainer = document.getElementById('new-video-container'); 
+        const videoPlayer = document.getElementById('video'); 
+        const videoSource = document.getElementById('video-source');
+        const videoThumbnail = document.getElementById('video-thumbnail');
+        const prevEpisodeBtn = document.getElementById('prev-episode-btn');
+        const nextEpisodeBtn = document.getElementById('next-episode-btn');
+        const currentSeasonLabel = document.getElementById('current-season-label'); 
+
+        // Nouveaux sélecteurs pour le tracker et la langue
+        const trackerSeasonLabel = document.getElementById('tracker-season-label');
+        const trackerEpisodeLabel = document.getElementById('tracker-episode-label');
+        const trackerGlobalLabel = document.getElementById('tracker-global-label');
+        const btnVf = document.getElementById('btn-vf');
+        const btnVost = document.getElementById('btn-vost');
+
+        // SÉLECTEURS CUSTOM PLAYER
+        const controls = document.getElementById('player-controls');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        const playbackLine = document.getElementById('playback-line');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const maxDurationDisplay = document.getElementById('max-duration');
+        const volumeSlider = document.getElementById('volume');
+        const volumeIcon = document.getElementById('volume-icon');
+        const fullscreenIcon = document.getElementById('fullscreen-icon');
+        const playPauseIconBar = document.getElementById('play-pause-icon-bar');
+        const skipMinus10Btn = document.getElementById('skipminus-10');
+        const skipPlus10Btn = document.getElementById('skip-10');
+        const playPauseBtn = document.getElementById('play-pause');
+        const muteBtn = document.getElementById('mute');
+
+
+        // --- SÉCURISATION (Mesures pour un environnement de démonstration) ---
+        (function() {
+            document.addEventListener('contextmenu', e => e.preventDefault());
+            document.addEventListener('dragstart', e => e.preventDefault());
+            document.addEventListener('drop', e => e.preventDefault());
+        })();
+
+
+        // --- LOGIQUE DE VUES (Single Page App) ---
+        function changeView(newView) {
+            if (currentView === newView) return; 
+
+            if (currentView === 'player') {
+                videoPlayer.pause();
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                }
+            }
+
+            // Gestion de la transition visuelle (hidden, opacity, translate)
+            views[currentView].classList.add('hidden', 'opacity-0', 'translate-x-10');
+            
+            currentView = newView;
+
+            // Activation de la nouvelle vue avec un léger délai pour la fluidité
+            setTimeout(() => {
+                views[newView].classList.remove('hidden');
+                void views[newView].offsetWidth; 
+                setTimeout(() => {
+                    views[newView].classList.remove('opacity-0', 'translate-x-10');
+                }, 10); 
+            }, 50); 
+        }
+
+
+        // --- LOGIQUE DE GÉNÉRATION D'URL AVEC LANGUE ---
+        function generateVideoUrl(seasonNum, episodeNum) {
+            // Utilise la variable d'état currentLang (VF ou VOST)
+            const langCode = currentLang; 
+            const sCode = String(seasonNum).padStart(2, '0');
+            const eCode = String(episodeNum).padStart(2, '0');
+            const filename = `${ANIME_DATA.basePath}-S${sCode}-E${eCode}.mp4`;
+            
+            // Format: https://cinecake.xyz/animes/{LANG}/One-Punch-Man/S01/One-Punch-Man-S01-E01.mp4
+            return `${base_url}${langCode}/${ANIME_DATA.basePath}/S${sCode}/${filename}`;
+        }
+
+        // --- UTILS : FORMATTAGE DU TEMPS ---
+        function formatTime(seconds) {
+            const sec = parseFloat(seconds);
+            if (!isFinite(sec) || sec < 0) {
+                return "00:00"; 
+            }
+            
+            const date = new Date(null);
+            date.setSeconds(sec);
+            const timeString = date.toISOString().substr(11, 8);
+            
+            return timeString.startsWith('00:') ? timeString.substring(3) : timeString;
+        }
+
+        // --- LOGIQUE DU LECTEUR CUSTOM ---
+
+        function togglePlayPause() {
+            if (videoPlayer.paused || videoPlayer.ended) {
+                videoPlayer.play().catch(e => console.error("Play failed:", e));
+                videoThumbnail.style.opacity = '0'; 
+                showControls();
+            } else {
+                videoPlayer.pause();
+                showControls(true);
+            }
+        }
+        
+        function updatePlayPauseIcons() {
+            playPauseIconBar.className = videoPlayer.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
+            if (videoPlayer.paused) showControls(true);
+        }
+        
+        function skipTime(seconds) {
+            if (!isFinite(videoPlayer.duration) || videoPlayer.duration === 0) return;
+            videoPlayer.currentTime = Math.max(0, Math.min(videoPlayer.duration, videoPlayer.currentTime + seconds));
+            showControls(videoPlayer.paused); 
+        }
+
+        function updateProgress() {
+            if (!isFinite(videoPlayer.duration) || videoPlayer.duration === 0) {
+                currentTimeDisplay.textContent = `00:00`;
+                maxDurationDisplay.textContent = `00:00`;
+                progressBarFill.style.width = '0%';
+                return;
+            }
+
+            const percentage = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+            progressBarFill.style.width = `${percentage}%`;
+            
+            currentTimeDisplay.textContent = formatTime(videoPlayer.currentTime);
+            maxDurationDisplay.textContent = formatTime(videoPlayer.duration);
+        }
+        
+        function handleSeek(e) {
+             if (!isFinite(videoPlayer.duration) || videoPlayer.duration === 0) return;
+             
+            const rect = playbackLine.getBoundingClientRect();
+            const clickPosition = e.clientX - rect.left;
+            const percentage = (clickPosition / rect.width);
+            
+            videoPlayer.currentTime = videoPlayer.duration * percentage;
+            showControls(true); 
+        }
+
+        function toggleMute() {
+            videoPlayer.muted = !videoPlayer.muted;
+            updateVolumeIcon();
+        }
+        
+        function handleVolumeChange() {
+            videoPlayer.volume = volumeSlider.value;
+            videoPlayer.muted = (volumeSlider.value == 0);
+            updateVolumeIcon();
+        }
+        
+        function updateVolumeIcon() {
+            const volume = videoPlayer.muted ? 0 : videoPlayer.volume;
+            
+            if (volume === 0) {
+                volumeIcon.className = 'fas fa-volume-off';
+            } else if (volume < 0.5) {
+                volumeIcon.className = 'fas fa-volume-down';
+            } else {
+                volumeIcon.className = 'fas fa-volume-up';
+            }
+            if (videoPlayer.muted && volumeSlider.value != 0) {
+                volumeSlider.dataset.lastVolume = videoPlayer.volume;
+                volumeSlider.value = 0;
+            } else if (!videoPlayer.muted && volumeSlider.value == 0) {
+                 volumeSlider.value = volumeSlider.dataset.lastVolume || 0.5;
+                 videoPlayer.volume = volumeSlider.value;
+            }
+        }
+
+        function toggleFullscreen() {
+            const playerWrapper = videoContainer.parentElement; 
+
+            if (!document.fullscreenElement) {
+                playerWrapper.requestFullscreen().catch(err => {
+                    console.error(`Erreur plein écran: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        /**
+         * Logique de plein écran et de rotation.
+         * Forcer le mode paysage sur mobile lors du plein écran.
+         */
+        function updateFullscreenIcon() {
+            const isFullscreen = document.fullscreenElement;
+            fullscreenIcon.className = isFullscreen ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
+
+            // --- GESTION DE LA ROTATION MOBILE (Mode paysage) ---
+            if (screen.orientation && screen.orientation.lock) {
+                if (isFullscreen) {
+                    // Tente de verrouiller l'orientation en mode paysage
+                    screen.orientation.lock('landscape').catch(err => {
+                        // console.log("Impossible de verrouiller l'orientation : ", err);
+                    });
+                } else {
+                    // Déverrouille l'orientation après la sortie du plein écran
+                    screen.orientation.unlock();
+                }
+            }
+        }
+
+
+        /**
+         * Gère les raccourcis clavier (Espace, F, Flèches Gauche/Droite).
+         */
+        function handleKeyDown(e) {
+            if (currentView !== 'player') return; 
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+            switch (e.key) {
+                case ' ': 
+                    e.preventDefault(); 
+                    togglePlayPause();
+                    break;
+                case 'f': 
+                case 'F':
+                    e.preventDefault(); 
+                    toggleFullscreen();
+                    break;
+                case 'ArrowRight': 
+                    e.preventDefault();
+                    skipTime(10);
+                    break;
+                case 'ArrowLeft': 
+                    e.preventDefault();
+                    skipTime(-10);
+                    break;
+            }
+        }
+
+
+        /**
+         * Affiche les contrôles pendant 2 secondes d'inactivité.
+         */
+        function showControls(force = false) {
+            clearTimeout(controlsTimeout);
+            controls.classList.remove('opacity-0');
+            
+            if (!force) {
+                controlsTimeout = setTimeout(() => {
+                    if (!videoPlayer.paused) {
+                        controls.classList.add('opacity-0');
+                    }
+                }, 2000); 
+            }
+        }
+        
+        function hideThumbnail() {
+            videoThumbnail.style.opacity = '0';
+        }
+
+
+        function setupCustomPlayer() {
+            if (!videoPlayer) return;
+
+            // Nettoyage et ajout des listeners de base
+            videoPlayer.addEventListener('loadedmetadata', updateProgress);
+            videoPlayer.addEventListener('timeupdate', updateProgress);
+            videoPlayer.addEventListener('play', updatePlayPauseIcons);
+            videoPlayer.addEventListener('pause', updatePlayPauseIcons);
+            videoPlayer.addEventListener('play', hideThumbnail); 
+            
+            playPauseBtn.onclick = togglePlayPause;
+            skipMinus10Btn.onclick = () => skipTime(-10);
+            skipPlus10Btn.onclick = () => skipTime(10);
+            
+            playbackLine.addEventListener('click', handleSeek);
+
+            muteBtn.onclick = toggleMute;
+            volumeSlider.addEventListener('input', handleVolumeChange);
+            
+            document.addEventListener('fullscreenchange', updateFullscreenIcon);
+            
+            videoContainer.addEventListener('mousemove', () => showControls(videoPlayer.paused));
+            videoContainer.addEventListener('touchstart', () => showControls(true));
+            videoContainer.addEventListener('touchend', () => showControls(videoPlayer.paused));
+            videoContainer.addEventListener('mouseleave', () => {
+                clearTimeout(controlsTimeout); 
+                if (!videoPlayer.paused) {
+                    controls.classList.add('opacity-0');
+                }
+            });
+            
+            document.addEventListener('keydown', handleKeyDown);
+
+            // Initialisation de l'état
+            updatePlayPauseIcons();
+            updateVolumeIcon();
+            updateFullscreenIcon();
+            updateProgress();
+            updateLanguageButtons(); // Initialisation des boutons de langue
+        }
+
+        // --- GESTION DE LA LANGUE ---
+        function setLanguage(lang) {
+            if (lang !== 'VF' && lang !== 'VOST') return;
+            if (lang === currentLang) return;
+            
+            currentLang = lang;
+            localStorage.setItem('animeLangPreference', lang);
+            
+            updateLanguageButtons(); 
+
+            // Recharger la vidéo en conservant le temps de lecture
+            if (currentView === 'player' && currentEpisode) {
+                renderVideoPlayer(true); 
+            }
+        }
+
+        function updateLanguageButtons() {
+            // S'assurer que les boutons existent avant de les manipuler
+            if (!btnVf || !btnVost) return;
+
+            [btnVf, btnVost].forEach(btn => {
+                btn.classList.remove('primary-bg-red', 'text-white', 'font-bold');
+                btn.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300', 'border-gray-700');
+            });
+
+            if (currentLang === 'VF') {
+                btnVf.classList.add('primary-bg-red', 'text-white', 'font-bold', 'border-red-600');
+                btnVf.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+            } else {
+                btnVost.classList.add('primary-bg-red', 'text-white', 'font-bold', 'border-red-600');
+                btnVost.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+            }
+        }
+
+
+        // --- FONCTIONS DE RENDU ET NAVIGATION ---
+
+        function renderSeasons() {
+            seasonsList.innerHTML = '';
+            ANIME_DATA.seasons.forEach(season => {
+                const button = document.createElement('button');
+                button.className = `w-full h-48 text-center p-0 transition duration-300 shadow-xl focus:outline-none transform hover:scale-[1.02] season-card text-white font-bold rounded-xl flex flex-col justify-end overflow-hidden`;
+                button.style.backgroundImage = `url('${season.imageUrl}')`;
+                button.innerHTML = `<div class="season-content"><span class="text-3xl font-extrabold">${season.label}</span><p class="text-sm mt-1 text-gray-200">(${season.episodes.length} épisodes)</p></div>`;
+                button.onclick = () => selectSeason(season.id);
+                seasonsList.appendChild(button);
+            });
+        }
+
+        function renderEpisodes() {
+            episodesList.innerHTML = '';
+            if (!currentSeason) {
+                episodesList.innerHTML = '<p class="text-gray-400">Erreur: Saison non sélectionnée.</p>';
+                currentSeasonLabel.textContent = "Erreur";
+                return;
+            }
+            currentSeasonLabel.textContent = currentSeason.label;
+            currentSeason.episodes.forEach(episode => {
+                const isActive = currentEpisode && currentEpisode.globalNum === episode.globalNum;
+                const button = document.createElement('button');
+                let buttonClass = `w-full text-left p-3 sm:p-4 rounded-xl transition-all duration-200 cursor-pointer flex items-center shadow-inner hover:bg-gray-700/50`;
+                button.innerHTML = `<span class="primary-yellow text-lg font-extrabold w-12 flex-shrink-0">E${String(episode.num).padStart(2, '0')}</span><span class="flex-grow text-base">${episode.title}</span>`;
+                if (isActive) {
+                    buttonClass += ' active-episode';
+                } else {
+                    buttonClass += ' text-gray-400';
+                }
+                button.className = buttonClass;
+                button.onclick = () => selectEpisode(episode);
+                episodesList.appendChild(button);
+            });
+        }
+        
+        function updateNavigationButtons() {
+            if (!currentEpisode) {
+                prevEpisodeBtn.disabled = true;
+                nextEpisodeBtn.disabled = true;
+                trackerSeasonLabel.textContent = "Non sélectionné";
+                trackerEpisodeLabel.textContent = "";
+                trackerGlobalLabel.textContent = "";
+                return;
+            }
+
+            prevEpisodeBtn.disabled = currentEpisode.globalNum <= 1;
+            nextEpisodeBtn.disabled = currentEpisode.globalNum >= TOTAL_EPISODES;
+        }
+
+        function renderVideoPlayer(keepTime = false) {
+            if (!currentEpisode || !currentSeason) {
+                videoSource.src = "";
+                videoPlayer.load();
+                videoThumbnail.style.opacity = '1';
+                updateNavigationButtons();
+                updateProgress();
+                return;
+            }
+
+            const videoUrl = generateVideoUrl(currentSeason.id, currentEpisode.num);
+            let savedTime = 0;
+
+            if (keepTime) {
+                // Sauvegarde du temps actuel avant de changer la source
+                savedTime = videoPlayer.currentTime;
+            }
+
+            // Mise à jour de l'affichage amélioré
+            trackerSeasonLabel.textContent = currentSeason.label;
+            trackerEpisodeLabel.textContent = `Épisode ${String(currentEpisode.num).padStart(2, '0')}`;
+            trackerGlobalLabel.textContent = `Global ${currentEpisode.globalNum} sur ${TOTAL_EPISODES}`;
+            
+            videoSource.src = videoUrl;
+            videoPlayer.load(); 
+            
+            if (keepTime && savedTime > 0) {
+                 // Tenter de reprendre la lecture au temps sauvegardé
+                videoPlayer.addEventListener('loadeddata', () => {
+                    videoPlayer.currentTime = savedTime;
+                    videoPlayer.play().catch(e => console.warn("Reprise automatique bloquée après changement de langue.", e));
+                }, { once: true });
+
+            } else {
+                 // Lecture normale pour un nouvel épisode
+                videoPlayer.play().catch(error => {
+                    console.warn("Lecture automatique bloquée. Cliquez ou appuyez sur Espace.", error);
+                    videoPlayer.pause();
+                    videoThumbnail.style.opacity = '1';
+                    showControls(true); 
+                });
+            }
+            
+            updateNavigationButtons();
+            setupCustomPlayer(); 
+            updateLanguageButtons(); // Assure que les boutons sont bien stylisés
+        }
+
+        // --- LOGIQUE DE SÉLECTION ---
+
+        function selectSeason(seasonId) {
+            const season = ANIME_DATA.seasons.find(s => s.id === seasonId);
+            if (season) {
+                currentSeason = season;
+                renderEpisodes(); 
+                changeView('episodes'); 
+                episodesList.scrollTop = 0;
+            }
+        }
+
+        function selectEpisode(episode) {
+            currentEpisode = episode;
+            currentSeason = ANIME_DATA.seasons.find(s => 
+                episode.globalNum >= s.episodes[0].globalNum && episode.globalNum <= s.episodes[s.episodes.length - 1].globalNum
+            );
+            
+            renderEpisodes();
+            renderVideoPlayer();
+            changeView('player'); 
+        }
+
+        // --- LOGIQUE DE NAVIGATION ÉPISODE ---
+
+        function findEpisodeByGlobalNum(globalNum) {
+            let count = 0;
+            for (const season of ANIME_DATA.seasons) {
+                for (const episode of season.episodes) {
+                    count++;
+                    if (count === globalNum) {
+                        return { seasonId: season.id, episode: {...episode, globalNum: count} }; 
+                    }
+                }
+            }
+            return null;
+        }
+
+        function goToPreviousEpisode() {
+            if (!currentEpisode || currentEpisode.globalNum <= 1) return;
+            const newGlobalNum = currentEpisode.globalNum - 1;
+            const newEpData = findEpisodeByGlobalNum(newGlobalNum);
+
+            if (newEpData) {
+                currentSeason = ANIME_DATA.seasons.find(s => s.id === newEpData.seasonId);
+                selectEpisode(newEpData.episode);
+            }
+        }
+
+        function goToNextEpisode() {
+            if (!currentEpisode || currentEpisode.globalNum >= TOTAL_EPISODES) return;
+            const newGlobalNum = currentEpisode.globalNum + 1;
+            const newEpData = findEpisodeByGlobalNum(newGlobalNum);
+
+            if (newEpData) {
+                currentSeason = ANIME_DATA.seasons.find(s => s.id === newEpData.seasonId);
+                selectEpisode(newEpData.episode);
+            }
+        }
+        
+        // --- INITIALISATION ---
+
+        window.onload = function initializeApp() {
+            // Initialisation de la langue au chargement
+            currentLang = localStorage.getItem('animeLangPreference') || 'VF';
+            updateLanguageButtons();
+            
+            renderSeasons();
+            renderVideoPlayer(); 
+            changeView('seasons'); 
+            setupCustomPlayer(); 
+        };
+    </script>
+</body>
+</html>
